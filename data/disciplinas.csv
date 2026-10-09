@@ -1,0 +1,14 @@
+id,codigo,nome,carga_horaria,periodo_sugerido
+PreCalc,MAT101,Pré-Cálculo,60,1
+Calc1,MAT102,Cálculo 1,80,2
+Calc2,MAT201,Cálculo 2,80,3
+Calc3,MAT301,Cálculo 3,80,4
+GA,MAT103,Geometria Analítica,60,1
+AL,MAT202,Álgebra Linear,60,2
+CG,CMP301,Computação Gráfica,60,3
+ED,CMP201,Estrutura de Dados,80,2
+SO,CMP302,Sistemas Operacionais,80,3
+Redes,CMP401,Redes de Computadores,60,4
+BD,CMP303,Banco de Dados,60,3
+IA1,CMP402,Inteligência Artificial 1,60,4
+IA2,CMP501,Inteligência Artificial 2,60,5

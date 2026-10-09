@@ -1,0 +1,12 @@
+PreRequisito,Disciplina
+PreCalc,Calc1
+Calc1,Calc2
+Calc2,Calc3
+GA,AL
+AL,CG
+ED,SO
+SO,Redes
+ED,BD
+ED,IA1
+AL,IA1
+IA1,IA2
