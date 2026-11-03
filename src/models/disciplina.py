@@ -20,4 +20,5 @@ class AlunoModel:
     id: int
     matricula: str
     nome: str
-    curso_id: int
+    curso_id: int = 1
+    curso_nome: str = ""

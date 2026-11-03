@@ -52,6 +52,69 @@ class TestDatabaseManager(unittest.TestCase):
         self.assertEqual(grafo.total_arestas(), 11)
         self.assertEqual(set(grafo.obter_sucessores("ED")), {"SO", "BD", "IA1"})
 
+    def test_impacto_grafo_banco_caso_1(self) -> None:
+        grafo = self.service.carregar_grafo_do_banco()
+        impacto_ed = set(grafo.consultar_impacto("ED"))
+        impacto_por_nome = set(grafo.consultar_impacto("Estrutura de Dados"))
+        self.assertEqual(impacto_ed, {"SO", "Redes", "BD", "IA1", "IA2"})
+        self.assertEqual(impacto_por_nome, {"SO", "Redes", "BD", "IA1", "IA2"})
+
+    def test_ciclo_grafo_banco_caso_2(self) -> None:
+        grafo = self.service.carregar_grafo_do_banco()
+        self.assertIsNone(grafo.detectar_ciclo())
+
+        valido, ciclo = grafo.validar_adicao_aresta(
+            "Inteligência Artificial 2", "Estrutura de Dados"
+        )
+        self.assertFalse(valido)
+        self.assertEqual(ciclo, ["ED", "IA1", "IA2", "ED"])
+
+        grafo.adicionar_aresta("IA2", "ED")
+        self.assertEqual(grafo.detectar_ciclo(), ["ED", "IA1", "IA2", "ED"])
+
+    def test_ordenacao_topologica_banco(self) -> None:
+        grafo = self.service.carregar_grafo_do_banco()
+        ordem = grafo.ordenacao_topologica()
+        ordem_dfs = grafo.ordenacao_topologica_dfs()
+        self.assertIsNotNone(ordem)
+        self.assertIsNotNone(ordem_dfs)
+        self.assertEqual(len(ordem), 13)
+        self.assertEqual(len(ordem_dfs), 13)
+
+        # Valida que todos os 11 pré-requisitos aparecem antes de suas dependentes na lista
+        dependencias = self.db.listar_dependencias()
+        for prereq, dep in dependencias:
+            self.assertLess(
+                ordem.index(prereq),
+                ordem.index(dep),
+                f"Pré-requisito {prereq} deveria preceder {dep} na ordenação topológica (Kahn)"
+            )
+            self.assertLess(
+                ordem_dfs.index(prereq),
+                ordem_dfs.index(dep),
+                f"Pré-requisito {prereq} deveria preceder {dep} na ordenação topológica (DFS)"
+            )
+
+        niveis = grafo.ordenacao_topologica_por_niveis()
+        self.assertIsNotNone(niveis)
+        self.assertEqual(len(niveis), 4)  # 4 semestres mínimos para formatura
+
+    def test_modelos_dominio_e_metricas(self) -> None:
+        modelos_disc = self.service.listar_modelos_disciplinas()
+        modelos_alunos = self.service.listar_modelos_alunos()
+        self.assertEqual(len(modelos_disc), 13)
+        self.assertEqual(len(modelos_alunos), 3)
+
+        ia1_model = next(d for d in modelos_disc if d.id == "IA1")
+        self.assertEqual(set(ia1_model.pre_requisitos), {"ED", "AL"})
+
+        grafo = self.service.carregar_grafo_do_banco()
+        self.assertEqual(grafo.fator_bloqueio("ED"), 5)
+        self.assertEqual(
+            set(grafo.consultar_pre_requisitos_transitivos("IA2")),
+            {"IA1", "ED", "AL", "GA"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

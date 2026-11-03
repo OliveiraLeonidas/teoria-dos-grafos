@@ -1,6 +1,39 @@
-# Sistema de Dependências de Disciplinas - Estrutura Base de Grafos
+# Sistema de Dependências de Disciplinas - Teoria dos Grafos
 
-Estrutura computacional orientada a objetos para representação de matrizes curriculares utilizando **Grafos Direcionados (Dígrafos)** e persistência em banco relacional **SQLite**.
+Estrutura computacional orientada a objetos para representação e análise de matrizes curriculares acadêmicas utilizando **Grafos Direcionados (Dígrafos)**, algoritmos de **Busca em Profundidade (DFS)**, **Detecção de Ciclos com 3 Cores**, **Ordenação Topológica (Algoritmo de Kahn)** e persistência em banco relacional **SQLite** e arquivos **CSV**.
+
+---
+
+## 🎯 Visão Geral da Matriz Curricular
+
+O grafo modela as relações de precedência acadêmica do curso de Ciência da Computação, onde cada aresta direcionada indica:
+$$u \longrightarrow v \iff \text{Disciplina } u \text{ é pré-requisito de } v$$
+
+```mermaid
+flowchart LR
+    subgraph Matematica["Matemática & Cálculo"]
+        PreCalc["Pré-Cálculo"] --> Calc1["Cálculo 1"]
+        Calc1 --> Calc2["Cálculo 2"]
+        Calc2 --> Calc3["Cálculo 3"]
+    end
+
+    subgraph Algebra["Álgebra & Visual"]
+        GA["Geometria Analítica"] --> AL["Álgebra Linear"]
+        AL --> CG["Computação Gráfica"]
+    end
+
+    subgraph Sistemas["Sistemas & Infraestrutura"]
+        ED["Estrutura de Dados"] --> SO["Sistemas Operacionais"]
+        SO --> Redes["Redes de Computadores"]
+    end
+
+    subgraph DadosIA["Dados & Inteligência Artificial"]
+        ED --> BD["Banco de Dados"]
+        ED --> IA1["Inteligência Artificial 1"]
+        AL --> IA1
+        IA1 --> IA2["Inteligência Artificial 2"]
+    end
+```
 
 ---
 
@@ -16,111 +49,97 @@ teoria-dos-grafos/
 │   └── universidade.db            # Base de dados SQLite
 ├── src/
 │   ├── models/
-│   │   ├── grafo.py               # Classes Vertice e GrafoDirecionado
+│   │   ├── grafo.py               # Classes Vertice e GrafoDirecionado (DFS, Ciclos, TopoSort)
 │   │   └── disciplina.py          # Dataclasses de DisciplinaModel e AlunoModel
 │   ├── database/
-│   │   ├── schema.sql             # Esquema DDL do SQLite
-│   │   ├── db_manager.py          # Gerenciador de conexão e queries SQLite
+│   │   ├── schema.sql             # Esquema DDL do SQLite com integridade referencial
+│   │   ├── db_manager.py          # Gerenciador de conexão (contextmanager) e queries
 │   │   └── seed.py                # Script de povoamento inicial e geração de CSVs
 │   └── services/
 │       └── curriculo_service.py   # Carregador do grafo a partir do SQLite e CSVs
 └── tests/
-    ├── test_grafo.py              # Testes unitários da estrutura base do dígrafo
-    └── test_database.py           # Testes de integração do SQLite
+    ├── test_grafo.py              # Testes unitários do dígrafo e dos algoritmos
+    └── test_database.py           # Testes de integração do SQLite e dos casos de teste
 ```
 
 ---
 
-## 🧠 Modelagem da Estrutura Base do Grafo
+## 🧠 Algoritmos Implementados
 
-### 1. Dígrafo e Orientação das Arestas
-A relação de precedência acadêmica é direcionada do pré-requisito para a disciplina dependente:
-$$\text{Pré-Requisito } (u) \longrightarrow \text{Disciplina Dependente } (v)$$
+### 1. Consulta de Impacto com Busca DFS (Caso de Teste 1)
+- **Método**: `grafo.consultar_impacto(id_vertice)` e `grafo.buscar_caminho_dfs(origem, destino)`
+- **Objetivo**: Descobrir todo o fecho transitivo de matérias liberadas direta ou indiretamente pela conclusão de uma disciplina.
+- **Exemplo**: O impacto de **Estrutura de Dados (ED)** retorna:
+  $$\text{Impacto(ED)} = \{\text{Banco de Dados, Sistemas Operacionais, Redes de Computadores, IA 1, IA 2}\}$$
 
-### 2. Classes Principais
-- **`Vertice`**: Representa a matéria curricular, contendo `id`, `rotulo` e metadados (`carga_horaria`, `periodo`).
-- **`GrafoDirecionado`**:
-  - `self.vertices`: Dicionário com os nós cadastrados.
-  - `self.adjacencias`: Lista de adjacência direta (`Pré-Requisito -> [Dependentes]`).
-  - `self.antecessores`: Lista de adjacência reversa (`Disciplina -> [Pré-Requisitos]`).
-  - **Grau de Saída ($d^+$)**: Quantidade de matérias destravadas pela conclusão da disciplina.
-  - **Grau de Entrada ($d^-$)**: Quantidade de pré-requisitos exigidos pela disciplina.
+### 2. Detecção de Ciclos com DFS de 3 Cores (Caso de Teste 2)
+- **Métodos**: `grafo.detectar_ciclo()`, `grafo.validar_adicao_aresta(u, v)` e `grafo.adicionar_aresta_segura(u, v)`
+- **Algoritmo**: Utiliza coloração de estados da DFS:
+  - **BRANCO (0)**: Vértice não visitado.
+  - **CINZA (1)**: Vértice em processamento na pilha de recursão.
+  - **PRETO (2)**: Vértice totalmente explorado.
+- **Detecção e Caminho Fechado**: Ao encontrar um vértice vizinho no estado **CINZA**, identifica a *back-edge* (aresta de retorno) e reconstrói o caminho fechado exato.
+- **Exemplo**: Ao simular a dependência circular $\text{IA2} \rightarrow \text{ED}$, o sistema alerta e recupera o ciclo:
+  $$\text{ED} \longrightarrow \text{IA1} \longrightarrow \text{IA2} \longrightarrow \text{ED}$$
+
+### 3. Ordenação Topológica da Grade (Algoritmo de Kahn)
+- **Métodos**: `grafo.ordenacao_topologica()` e `grafo.ordenacao_topologica_por_niveis()`
+- **Objetivo**: Determinar a sequência linear viável para cursar as matérias respeitando todos os pré-requisitos, além de agrupar as disciplinas nas camadas topológicas mínimas de semestres (caminho crítico de 4 semestres para formatura).
 
 ---
 
-## 🚀 Como executar
+## 🚀 Como Executar
 
 ### Pré-requisitos
-- **Python 3.10+** (utiliza apenas bibliotecas padrão: `sqlite3`, `unittest`, `dataclasses`).
+- **Python 3.10+** (utiliza estritamente a biblioteca padrão: `sqlite3`, `unittest`, `dataclasses`).
 
-### 1. Visualização Automática das Estruturas e Dados
+### 1. Demonstração Automática Completa (Casos 1 e 2 + Ordenação)
 ```bash
-python3 main.py --demo
+python main.py --demo
 ```
 
-### 2. Menu Interativo
+### 2. Menu Interativo no Terminal
 ```bash
-python3 main.py
+python main.py
 ```
+
+Opções disponíveis no menu:
+- `[1]` Exibir Grafo Completo (Vértices, Arestas, Graus e Adjacências)
+- `[2]` Exibir Dados do SQLite (Alunos e Histórico)
+- `[3]` Consultar Adjacências e Impacto de uma Disciplina
+- `[4]` Adicionar Vértice Manualmente ao Grafo
+- `[5]` Adicionar Aresta Manualmente ao Grafo (com Validação Preventiva de Ciclos)
+- `[6]` Reinicializar Banco SQLite e CSVs (Seed)
+- `[7]` Consultar Impacto Completo (Busca DFS - Caso de Teste 1)
+- `[8]` Verificar Ciclos no Grafo / Simular Falha (Caso de Teste 2)
+- `[9]` Gerar Ordenação Topológica da Grade Curricular
+- `[0]` Sair
 
 ### 3. Execução dos Testes Automatizados
 ```bash
-python3 -m unittest discover -s tests -v
+python -m unittest discover -s tests -v
 ```
 
 ### 4. Reinicialização da Base de Dados (Seed)
 ```bash
-python3 src/database/seed.py
+python src/database/seed.py
 ```
 
 ---
 
-## 💻 Exemplos de Entrada e Saída
+## 🧪 Casos de Teste Validados
 
-### 1. Consulta Interativa no Terminal (`python3 main.py`)
+### Caso de Teste 1: Consulta de Sucesso
+- **Entrada**: Consultar impacto de `Estrutura de Dados` (`ED`).
+- **Saída**:
+  - `Banco de Dados` (Caminho: `ED -> BD`)
+  - `Sistemas Operacionais` (Caminho: `ED -> SO`)
+  - `Redes de Computadores` (Caminho: `ED -> SO -> Redes`)
+  - `Inteligência Artificial 1` (Caminho: `ED -> IA1`)
+  - `Inteligência Artificial 2` (Caminho: `ED -> IA1 -> IA2`)
 
-Ao executar `python3 main.py`, selecione a opção `[3]` para consultar uma matéria:
-
-#### Entrada (Input):
-```text
-Escolha uma opcao [0-6]: 3
-Digite o identificador da disciplina (ex: ED, PreCalc, IA1): ED
-```
-
-#### Saída (Output):
-```text
-Disciplina: Estrutura de Dados [ED]
-Grau de Entrada (pre-requisitos exigidos): 0
-Pre-requisitos imediatos: []
-Grau de Saida (disciplinas destravadas): 3
-Dependentes diretos: ['SO', 'BD', 'IA1']
-```
-
----
-
-### 2. Consulta via Código Python
-
-#### Entrada (Input no código):
-```python
-from src.services.curriculo_service import CurriculoService
-
-service = CurriculoService()
-grafo = service.carregar_grafo_do_banco()
-
-print("Sucessores de ED:", grafo.obter_sucessores("ED"))
-print("Antecessores de IA1:", grafo.obter_antecessores("IA1"))
-print("Grau de Saida de ED:", grafo.grau_saida("ED"))
-print("Grau de Entrada de IA1:", grafo.grau_entrada("IA1"))
-print("Total de Vertices:", grafo.total_vertices())
-print("Total de Arestas:", grafo.total_arestas())
-```
-
-#### Saída (Output):
-```text
-Sucessores de ED: ['SO', 'BD', 'IA1']
-Antecessores de IA1: ['ED', 'AL']
-Grau de Saida de ED: 3
-Grau de Entrada de IA1: 2
-Total de Vertices: 13
-Total de Arestas: 11
-```
+### Caso de Teste 2: Identificação de Falha (Ciclo)
+- **Entrada**: Tentativa de adicionar aresta `IA2 -> ED`.
+- **Saída**:
+  - `[ALERTA DE ERRO: DEPENDENCIA CIRCULAR DETECTADA]`
+  - Caminho fechado: `ED -> IA1 -> IA2 -> ED`

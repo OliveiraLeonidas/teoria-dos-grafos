@@ -2,6 +2,7 @@ import csv
 from pathlib import Path
 
 from ..database.db_manager import DatabaseManager
+from ..models.disciplina import AlunoModel, DisciplinaModel
 from ..models.grafo import GrafoDirecionado
 
 
@@ -9,22 +10,61 @@ class CurriculoService:
     def __init__(self, db_manager: DatabaseManager | None = None) -> None:
         self.db_manager = db_manager or DatabaseManager()
 
-    def carregar_grafo_do_banco(self) -> GrafoDirecionado:
-        grafo = GrafoDirecionado()
+    def listar_modelos_disciplinas(self) -> list[DisciplinaModel]:
+        disciplinas_raw = self.db_manager.listar_disciplinas()
+        dependencias = self.db_manager.listar_dependencias()
 
-        disciplinas = self.db_manager.listar_disciplinas()
-        for d in disciplinas:
-            grafo.adicionar_vertice(
-                id_vertice=d["id"],
-                rotulo=d["nome"],
+        prereqs_por_disc: dict[str, list[str]] = {}
+        for prereq_id, disc_id in dependencias:
+            prereqs_por_disc.setdefault(disc_id, []).append(prereq_id)
+
+        return [
+            DisciplinaModel(
+                id=d["id"],
+                nome=d["nome"],
                 codigo=d["codigo"],
                 carga_horaria=d["carga_horaria"],
-                periodo=d["periodo_sugerido"],
+                periodo_sugerido=d["periodo_sugerido"],
+                curso_id=d.get("curso_id", 1),
+                pre_requisitos=prereqs_por_disc.get(d["id"], []),
+            )
+            for d in disciplinas_raw
+        ]
+
+    def listar_modelos_alunos(self) -> list[AlunoModel]:
+        alunos_raw = self.db_manager.listar_alunos()
+        return [
+            AlunoModel(
+                id=a["id"],
+                matricula=a["matricula"],
+                nome=a["nome"],
+                curso_id=a.get("curso_id", 1),
+                curso_nome=a.get("curso", ""),
+            )
+            for a in alunos_raw
+        ]
+
+    def salvar_dependencia_no_banco(
+        self, pre_requisito_id: str, disciplina_id: str
+    ) -> None:
+        self.db_manager.adicionar_dependencia(pre_requisito_id, disciplina_id)
+
+    def carregar_grafo_do_banco(self) -> GrafoDirecionado:
+        grafo = GrafoDirecionado()
+        modelos = self.listar_modelos_disciplinas()
+
+        for d in modelos:
+            grafo.adicionar_vertice(
+                id_vertice=d.id,
+                rotulo=d.nome,
+                codigo=d.codigo,
+                carga_horaria=d.carga_horaria,
+                periodo=d.periodo_sugerido,
             )
 
-        dependencias = self.db_manager.listar_dependencias()
-        for prereq_id, dep_id in dependencias:
-            grafo.adicionar_aresta(prereq_id, dep_id)
+        for d in modelos:
+            for prereq_id in d.pre_requisitos:
+                grafo.adicionar_aresta(prereq_id, d.id)
 
         return grafo
 

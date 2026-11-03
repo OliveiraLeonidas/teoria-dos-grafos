@@ -46,12 +46,12 @@ def executar_seed(db_manager: DatabaseManager | None = None) -> None:
             ("GA", "MAT103", "Geometria Analítica", 60, 1, 1),
             ("AL", "MAT202", "Álgebra Linear", 60, 2, 1),
             ("CG", "CMP301", "Computação Gráfica", 60, 3, 1),
-            ("ED", "CMP201", "Estrutura de Dados", 80, 2, 1),
-            ("SO", "CMP302", "Sistemas Operacionais", 80, 3, 1),
-            ("Redes", "CMP401", "Redes de Computadores", 60, 4, 1),
-            ("BD", "CMP303", "Banco de Dados", 60, 3, 1),
-            ("IA1", "CMP402", "Inteligência Artificial 1", 60, 4, 1),
-            ("IA2", "CMP501", "Inteligência Artificial 2", 60, 5, 1),
+            ("ED", "CMP201", "Estrutura de Dados", 80, 1, 1),
+            ("SO", "CMP302", "Sistemas Operacionais", 80, 2, 1),
+            ("Redes", "CMP401", "Redes de Computadores", 60, 3, 1),
+            ("BD", "CMP303", "Banco de Dados", 60, 2, 1),
+            ("IA1", "CMP402", "Inteligência Artificial 1", 60, 3, 1),
+            ("IA2", "CMP501", "Inteligência Artificial 2", 60, 4, 1),
         ]
 
         cursor.executemany(
