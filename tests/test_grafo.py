@@ -200,5 +200,45 @@ class TestGrafoDirecionado(unittest.TestCase):
         self.assertEqual(self.g.consultar_pre_requisitos_transitivos("ED"), [])
 
 
+    def test_validacao_ignora_ciclo_preexistente_fora_da_aresta(self) -> None:
+        # Ciclo forçado ED -> IA1 -> ED; a aresta GA -> AL não participa dele.
+        self.g.adicionar_aresta("ED", "IA1")
+        self.g.adicionar_aresta("IA1", "ED")
+        self.g.adicionar_vertice("GA")
+        self.g.adicionar_vertice("AL")
+
+        self.assertEqual(self.g.validar_adicao_aresta("GA", "AL"), (True, None))
+        self.assertFalse(self.g.validar_adicao_aresta("IA1", "ED")[0])
+
+    def test_validacao_registra_passos_da_dfs_3_cores(self) -> None:
+        self.g.adicionar_aresta("ED", "IA1")
+        self.g.adicionar_aresta("IA1", "IA2")
+        passos: list[tuple[str, str]] = []
+        valido, ciclo = self.g.validar_adicao_aresta("IA2", "ED", passos=passos)
+        self.assertFalse(valido)
+        self.assertEqual(ciclo, ["ED", "IA1", "IA2", "ED"])
+        self.assertEqual(passos[-1], ("RETORNO", "IA2->ED"))
+        self.assertEqual(self.g.total_arestas(), 2)  # aresta temporária removida
+
+    def test_validacao_nao_altera_o_grafo(self) -> None:
+        self.g.adicionar_aresta("ED", "IA1")
+        self.g.validar_adicao_aresta("IA1", "NovaDisciplina")
+        self.assertFalse(self.g.contem_vertice("NovaDisciplina"))
+        self.assertEqual(self.g.total_arestas(), 1)
+
+    def test_detectar_ciclo_registra_passos(self) -> None:
+        self.g.adicionar_aresta("ED", "IA1")
+        self.g.adicionar_aresta("IA1", "IA2")
+        self.g.adicionar_aresta("IA2", "ED")
+
+        passos: list[tuple[str, str]] = []
+        ciclo = self.g.detectar_ciclo(passos=passos)
+        self.assertEqual(ciclo, ["ED", "IA1", "IA2", "ED"])
+        self.assertEqual(
+            passos,
+            [("CINZA", "ED"), ("CINZA", "IA1"), ("CINZA", "IA2"), ("RETORNO", "IA2->ED")],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -236,13 +236,21 @@ class GrafoDirecionado:
         rotacionado.append(inicio_preferido)
         return rotacionado
 
-    def detectar_ciclo(self, vertice_referencia: str | None = None) -> list[str] | None:
+    def detectar_ciclo(
+        self,
+        vertice_referencia: str | None = None,
+        passos: list[tuple[str, str]] | None = None,
+    ) -> list[str] | None:
         """
         Verifica se o dígrafo contém ciclos utilizando Busca em Profundidade (DFS)
         com o algoritmo de coloração de 3 cores:
           - BRANCO (0): Vértice não visitado
           - CINZA  (1): Vértice em processamento (na pilha de recursão / caminho atual)
           - PRETO  (2): Vértice totalmente explorado
+
+        Se 'passos' for informado, cada transição de cor é registrada nele como
+        ("CINZA", u), ("PRETO", u) ou ("RETORNO", "u->v") para a aresta de retorno.
+        É o que o frontend usa para animar a execução real do algoritmo.
 
         Retorna o caminho fechado do ciclo (ex: ['ED', 'IA1', 'IA2', 'ED'])
         ou None caso o grafo seja um Grafo Acíclico Direcionado (DAG).
@@ -254,13 +262,19 @@ class GrafoDirecionado:
 
         ref = self.resolver_vertice(vertice_referencia) if vertice_referencia else None
 
+        def _registrar(evento: str, alvo: str) -> None:
+            if passos is not None:
+                passos.append((evento, alvo))
+
         def _dfs(u: str) -> bool:
             nonlocal ciclo_encontrado
             cor[u] = CINZA
+            _registrar("CINZA", u)
 
             for vizinho in self.adjacencias.get(u, []):
                 # Se o vizinho é CINZA, detectamos uma aresta de retorno (back-edge)
                 if cor.get(vizinho, BRANCO) == CINZA:
+                    _registrar("RETORNO", f"{u}->{vizinho}")
                     caminho = [vizinho]
                     atual = u
                     while atual != vizinho and atual is not None:
@@ -288,6 +302,7 @@ class GrafoDirecionado:
                         return True
 
             cor[u] = PRETO
+            _registrar("PRETO", u)
             return False
 
         ordem_vertices = list(self.vertices.keys())
@@ -303,12 +318,22 @@ class GrafoDirecionado:
         return None
 
     def validar_adicao_aresta(
-        self, pre_requisito: str, dependente: str
+        self,
+        pre_requisito: str,
+        dependente: str,
+        passos: list[tuple[str, str]] | None = None,
     ) -> tuple[bool, list[str] | None]:
         """
         Verifica preventivamente se a inclusão da aresta (pre_requisito -> dependente)
         violaria a propriedade acíclica (criando dependência circular/ciclo),
-        executando o algoritmo DFS de 3 cores (detectar_ciclo).
+        executando o algoritmo DFS de 3 cores (detectar_ciclo) sobre o grafo com
+        a aresta inserida temporariamente. O grafo é restaurado ao final.
+
+        Se 'passos' for informado, recebe as transições de cor da DFS.
+
+        Se a DFS encontrar um ciclo que já existia e não passa pela nova aresta,
+        a decisão é tomada procurando um caminho v ~> u (buscar_caminho_dfs):
+        só ele faz a aresta u -> v fechar um ciclo.
 
         Retorna:
           (True, None) caso a aresta seja segura.
@@ -320,30 +345,35 @@ class GrafoDirecionado:
         if u == v:
             return False, [u, v]
 
-        # Se algum dos vértices ainda não existe no grafo e u != v,
-        # uma única aresta nova entre eles jamais fechará ciclo se não havia ciclo antes.
         u_existia = u in self.vertices
         v_existia = v in self.vertices
         aresta_existia = u_existia and v_existia and (v in self.adjacencias.get(u, []))
 
         self.adicionar_aresta(u, v)
         try:
-            ciclo = self.detectar_ciclo(vertice_referencia=v)
+            ciclo = self.detectar_ciclo(vertice_referencia=v, passos=passos)
         finally:
             if not aresta_existia:
                 self.remover_aresta(u, v)
-            if not u_existia:
-                self.vertices.pop(u, None)
-                self.adjacencias.pop(u, None)
-                self.antecessores.pop(u, None)
-            if not v_existia:
-                self.vertices.pop(v, None)
-                self.adjacencias.pop(v, None)
-                self.antecessores.pop(v, None)
+            for vertice, existia in ((u, u_existia), (v, v_existia)):
+                if not existia:
+                    self.vertices.pop(vertice, None)
+                    self.adjacencias.pop(vertice, None)
+                    self.antecessores.pop(vertice, None)
 
-        if ciclo is not None:
+        if ciclo is None:
+            return True, None
+
+        passa_pela_aresta = any(
+            ciclo[i] == u and ciclo[i + 1] == v for i in range(len(ciclo) - 1)
+        )
+        if passa_pela_aresta:
             return False, ciclo
 
+        # Ciclo antigo, sem relação com u -> v.
+        caminho_retorno = self.buscar_caminho_dfs(v, u)
+        if caminho_retorno is not None:
+            return False, caminho_retorno + [v]
         return True, None
 
     def adicionar_aresta_segura(
