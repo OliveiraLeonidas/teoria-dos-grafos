@@ -11,6 +11,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
+from src.api.server import iniciar_servidor
 from src.database.seed import executar_seed
 from src.models.grafo import GrafoDirecionado
 from src.services.curriculo_service import CurriculoService
@@ -309,8 +310,15 @@ def menu_interativo(service: CurriculoService) -> None:
                 print("Origem e destino devem ser informados.")
                 continue
 
-            u = grafo.resolver_vertice(u_in) or u_in
-            v = grafo.resolver_vertice(v_in) or v_in
+            u = grafo.resolver_vertice(u_in)
+            v = grafo.resolver_vertice(v_in)
+            nao_encontrados = [t for t, r in ((u_in, u), (v_in, v)) if r is None]
+            if nao_encontrados:
+                print(
+                    f"Disciplina(s) nao encontrada(s): {nao_encontrados}. "
+                    "Cadastre o vertice antes (opcao 4)."
+                )
+                continue
 
             valido, ciclo = grafo.validar_adicao_aresta(u, v)
             if not valido and ciclo:
@@ -354,6 +362,17 @@ def menu_interativo(service: CurriculoService) -> None:
                 fonte_atual = "CSV (disciplinas.csv & dependencias.csv)"
                 print("Grafo recarregado a partir dos arquivos CSV com sucesso.")
             else:
+                confirmar = (
+                    input(
+                        "O seed APAGA o banco e recria os dados iniciais "
+                        "(dependencias salvas serao perdidas). Continuar? (s/N): "
+                    )
+                    .strip()
+                    .lower()
+                )
+                if confirmar != "s":
+                    print("Operacao cancelada.")
+                    continue
                 executar_seed()
                 grafo = service.carregar_grafo_do_banco()
                 fonte_atual = "SQLite (universidade.db)"
@@ -373,7 +392,10 @@ def menu_interativo(service: CurriculoService) -> None:
 
 def main() -> None:
     service = CurriculoService()
-    if len(sys.argv) > 1 and sys.argv[1] == "--demo":
+    if len(sys.argv) > 1 and sys.argv[1] == "--api":
+        porta = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[2] == "--porta" else 8000
+        iniciar_servidor(porta, service)
+    elif len(sys.argv) > 1 and sys.argv[1] == "--demo":
         exibir_estrutura_grafo(service)
         exibir_dados_sqlite(service)
     elif sys.stdin.isatty():

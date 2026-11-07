@@ -12,7 +12,18 @@ except ImportError:
     from src.database.db_manager import DatabaseManager
 
 
-def executar_seed(db_manager: DatabaseManager | None = None) -> None:
+def executar_seed(
+    db_manager: DatabaseManager | None = None,
+    diretorio_csv: Path | None = None,
+) -> None:
+    """
+    Recria o conteúdo do banco e exporta os CSVs.
+
+    Os CSVs vão para 'diretorio_csv'. Quando ele não é informado, só são escritos
+    em data/ se o banco também for o padrão; um banco de teste não regrava os
+    arquivos versionados do projeto.
+    """
+    usando_banco_padrao = db_manager is None
     if db_manager is None:
         db_manager = DatabaseManager()
 
@@ -119,20 +130,23 @@ def executar_seed(db_manager: DatabaseManager | None = None) -> None:
 
         conn.commit()
 
-    root_dir = Path(__file__).resolve().parent.parent.parent
-    data_dir = root_dir / "data"
+    if diretorio_csv is None:
+        if not usando_banco_padrao:
+            return
+        diretorio_csv = ROOT_DIR / "data"
+    data_dir = Path(diretorio_csv)
     data_dir.mkdir(parents=True, exist_ok=True)
 
     csv_disc_path = data_dir / "disciplinas.csv"
     with open(csv_disc_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, lineterminator="\n")
         writer.writerow(["id", "codigo", "nome", "carga_horaria", "periodo_sugerido"])
         for d in disciplinas:
             writer.writerow([d[0], d[1], d[2], d[3], d[4]])
 
     csv_dep_path = data_dir / "dependencias.csv"
     with open(csv_dep_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, lineterminator="\n")
         writer.writerow(["PreRequisito", "Disciplina"])
         for dep in dependencias:
             writer.writerow([dep[1], dep[0]])

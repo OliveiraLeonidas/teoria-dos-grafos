@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from src.database.db_manager import DatabaseManager
 from src.database.seed import executar_seed
@@ -8,10 +10,17 @@ from src.services.curriculo_service import CurriculoService
 class TestDatabaseManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        executar_seed()
+        # Banco temporário: os testes não podem alterar data/universidade.db nem os CSVs.
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.db_path = str(Path(cls._tmp.name) / "teste.db")
+        executar_seed(DatabaseManager(cls.db_path))
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._tmp.cleanup()
 
     def setUp(self) -> None:
-        self.db = DatabaseManager()
+        self.db = DatabaseManager(self.db_path)
         self.service = CurriculoService(self.db)
 
     def test_disciplinas_cadastradas(self) -> None:
@@ -114,6 +123,17 @@ class TestDatabaseManager(unittest.TestCase):
             set(grafo.consultar_pre_requisitos_transitivos("IA2")),
             {"IA1", "ED", "AL", "GA"},
         )
+
+    def test_alunos_trazem_curso_id(self) -> None:
+        alunos = self.db.listar_alunos()
+        self.assertTrue(all(a["curso_id"] == 1 for a in alunos))
+
+    def test_adicionar_e_remover_dependencia(self) -> None:
+        self.db.adicionar_dependencia("GA", "CG")
+        self.assertIn(("GA", "CG"), self.db.listar_dependencias())
+        self.assertTrue(self.db.remover_dependencia("GA", "CG"))
+        self.assertNotIn(("GA", "CG"), self.db.listar_dependencias())
+        self.assertFalse(self.db.remover_dependencia("GA", "CG"))
 
 
 if __name__ == "__main__":
